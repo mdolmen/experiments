@@ -15,24 +15,36 @@
 
 #include <math.h>
 
-#define THRESHOLD 150
-
-// TODO: change path and find offset in the target lib (libc?)
-//#define LIBCRYPTO_PATH "axtls-code/_stage/libaxtls.so.1"
-//#define LIBCRYPTO_SQUARE_FUNCTION "bi_square"
-//#define LIBCRYPTO_SQUARE_OFFSET 0x80
-//#define LIBCRYPTO_MULTIPLY_FUNCTION "bi_terminate"
-//#define LIBCRYPTO_MULTIPLY_OFFSET 0x100
-//#define LIBCRYPTO_BARRETT_FUNCTION "bi_subtract"
-//#define LIBCRYPTO_BARRETT_OFFSET 0x78
+#define THRESHOLD 100
 
 #define LIBMATH_PATH "/lib64/libm.so.6"
-#define LIBMATH_SINHF "asin" //"__sinhf_finite"
-#define LIBMATH_SINHF_OFFSET 0x42 //0x448a0-0x448bd
+#define LIBMATH_ASIN "asin"
+#define LIBMATH_ACOS "acos"
+#define LIBMATH_FMODF "fmodf"
 
-#define NONE 0
-#define SQUARE 1
-#define MULTIPLY 2
+#define LIBMATH_ASIN_OFFSET 0x42
+#define LIBMATH_ACOS_OFFSET 0x42
+//#define LIBMATH_FMODF_OFFSET 0xa
+
+/*
+ * the version of lgamma called depends on the glibc version, so its better to
+ * use another symbol instead.
+ * <lgammaf@@GLIBC_2.23>
+ * <lgammaf@@GLIBC_2.2.5>
+ */
+
+// closest exported symbol is lgammaf
+#define LIBMATH_LGAMMAF "lgammaf"
+// annobin_w_expf_compat.c_end
+//#define LIBMATH_LGAMMAF_OFFSET 0x7
+// annobin_k_standardf.c_end
+#define LIBMATH_LGAMMAF_OFFSET 0x13e
+#define LIBMATH_TGAMMAF "tgammaf"
+#define LIBMATH_TGAMMAF_OFFSET 0x54e
+
+#define LIBMATH_FMODF "fmodf"
+// annobin_w_exp10f_compat.c_end
+#define LIBMATH_FMODF_OFFSET 4
 
 #define RESULTS_SIZE 1024*1024
 
@@ -88,7 +100,6 @@ int probe(void *addr) {
 	return 0;
 }
 
-
 // TODO: change addresses
 /* Probing thread */
 void *probe_thread(void *arg) {
@@ -98,21 +109,45 @@ void *probe_thread(void *arg) {
 		error("dlopen failed: %s",dl_error);
 	}
 
-	void *sinhf = dlsym(library, LIBMATH_SINHF);
+	void *asin = dlsym(library, LIBMATH_ASIN);
 	if ((dl_error = dlerror()) != NULL)  {
 		error("error in dlsym : %s",dl_error);
 	}
 
-	sinhf += LIBMATH_SINHF_OFFSET;
+	void *acos = dlsym(library, LIBMATH_ACOS);
+	if ((dl_error = dlerror()) != NULL)  {
+		error("error in dlsym : %s",dl_error);
+	}
+
+	void *lgammaf = dlsym(library, LIBMATH_LGAMMAF);
+	if ((dl_error = dlerror()) != NULL)  {
+		error("error in dlsym : %s",dl_error);
+	}
+
+	void *tgammaf = dlsym(library, LIBMATH_TGAMMAF);
+	if ((dl_error = dlerror()) != NULL)  {
+		error("error in dlsym : %s",dl_error);
+	}
+
+	void *fmodf= dlsym(library, LIBMATH_FMODF);
+	if ((dl_error = dlerror()) != NULL)  {
+		error("error in dlsym : %s",dl_error);
+	}
+
+	asin += LIBMATH_ASIN_OFFSET;
+	tgammaf += LIBMATH_TGAMMAF_OFFSET;
+    fmodf -= LIBMATH_FMODF_OFFSET;
 
 	memset(results, 0, RESULTS_SIZE);
 
 	info("probe_thread started");
-	info("LIB is at            %p", library);
-	info("__sinhf_finite is at %p", sinhf);
+	info("LIB is at %p", library);
+	info("asin is at %p", asin);
+	info("tgamma at %p", tgammaf);
+	info("fmodf is at %p", fmodf);
 
     // TODO: receiver logic
-	int pos = 0;
+	int pos = 0, p1 = 0, p2 = 0, p3 = 0;
 	while (1) {
 		pthread_mutex_lock(&stopMutex);
 		if ( stop_probing ) {
@@ -120,19 +155,36 @@ void *probe_thread(void *arg) {
 		}
 		pthread_mutex_unlock(&stopMutex);
 
-		int sinhf_seen = probe(sinhf);
+		int asin_seen = 0, acos_seen = 0, fmodf_seen = 0, tgammaf_seen = 0;
 
-		if (sinhf_seen) {
+		asin_seen = probe(asin);
+        tgammaf_seen = probe(tgammaf);
+        fmodf_seen = probe(fmodf);
+
+		if (asin_seen) {
 			results[pos]='S';
 			pos++;
+            p1++;
 		}
+        else if (tgammaf_seen) {
+            results[pos] = 'G';
+            pos++;
+            p2++;
+        }
+        else if (fmodf_seen) {
+            results[pos] = 'M';
+            pos++;
+            p3++;
+        }
 
 		if (pos >= RESULTS_SIZE) {
+            printf("pos = %d\n", pos);
 			error("Need more space in results");
 			break;
 		}
 	}
-	info("Results len : %d",pos);
+	info("Results len : %d", pos);
+    info("Probe 1 : %d | Probe 2 : %d | Probe 3 : %d\n", p1, p2, p3);
 	pthread_exit(NULL);
 }
 
@@ -155,7 +207,7 @@ int main(int argc, char **argv) {
 
     // Wait to give time for the sender to do his job
     puts("[+] Waiting..");
-    sleep(10);
+    sleep(5);
 
 	/* Stop the probing thread */
 	pthread_mutex_lock(&stopMutex);
@@ -170,6 +222,20 @@ int main(int argc, char **argv) {
 	}
 	write(result_fd,results,strlen(results));
 	close(result_fd);
+    
+    int prev_one = 0, prev_zero = 0;
+
+    for (int i = 0; i < results; i++) {
+        if (results[i] == 'S') {
+            if (prev_zero) {
+                
+            }
+            prev_one = 1;
+        }
+        else {
+            prev_zero = 1;
+        }
+    }
 
 	return EXIT_SUCCESS;
 }
