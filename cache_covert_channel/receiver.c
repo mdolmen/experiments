@@ -15,7 +15,7 @@
 
 #include <math.h>
 
-#define THRESHOLD 100
+#define THRESHOLD 150
 
 #define LIBMATH_PATH "/lib64/libm.so.6"
 #define LIBMATH_ASIN "asin"
@@ -24,27 +24,16 @@
 
 #define LIBMATH_ASIN_OFFSET 0x42
 #define LIBMATH_ACOS_OFFSET 0x42
-//#define LIBMATH_FMODF_OFFSET 0xa
-
-/*
- * the version of lgamma called depends on the glibc version, so its better to
- * use another symbol instead.
- * <lgammaf@@GLIBC_2.23>
- * <lgammaf@@GLIBC_2.2.5>
- */
 
 // closest exported symbol is lgammaf
 #define LIBMATH_LGAMMAF "lgammaf"
-// annobin_w_expf_compat.c_end
-//#define LIBMATH_LGAMMAF_OFFSET 0x7
-// annobin_k_standardf.c_end
-#define LIBMATH_LGAMMAF_OFFSET 0x13e
+#define LIBMATH_LGAMMAF_OFFSET 0x13e // annobin_k_standardf.c_end
+
 #define LIBMATH_TGAMMAF "tgammaf"
 #define LIBMATH_TGAMMAF_OFFSET 0x54e
 
 #define LIBMATH_FMODF "fmodf"
-// annobin_w_exp10f_compat.c_end
-#define LIBMATH_FMODF_OFFSET 4
+#define LIBMATH_FMODF_OFFSET 4 // annobin_w_exp10f_compat.c_end
 
 #define RESULTS_SIZE 1024*1024
 
@@ -75,7 +64,6 @@ static void ok(const char * format, ...) {
 	vprintf(format, myargs);
 	printf("\n");
 }
-
 
 /* FLUSH + RELOAD probe function */
 int probe(void *addr) {
@@ -114,29 +102,23 @@ void *probe_thread(void *arg) {
 		error("error in dlsym : %s",dl_error);
 	}
 
-	void *acos = dlsym(library, LIBMATH_ACOS);
-	if ((dl_error = dlerror()) != NULL)  {
-		error("error in dlsym : %s",dl_error);
-	}
+	//void *acos = dlsym(library, LIBMATH_ACOS);
+	//if ((dl_error = dlerror()) != NULL)  {
+	//	error("error in dlsym : %s",dl_error);
+	//}
 
-	void *lgammaf = dlsym(library, LIBMATH_LGAMMAF);
-	if ((dl_error = dlerror()) != NULL)  {
-		error("error in dlsym : %s",dl_error);
-	}
+	//void *lgammaf = dlsym(library, LIBMATH_LGAMMAF);
+	//if ((dl_error = dlerror()) != NULL)  {
+	//	error("error in dlsym : %s",dl_error);
+	//}
 
 	void *tgammaf = dlsym(library, LIBMATH_TGAMMAF);
 	if ((dl_error = dlerror()) != NULL)  {
 		error("error in dlsym : %s",dl_error);
 	}
 
-	void *fmodf= dlsym(library, LIBMATH_FMODF);
-	if ((dl_error = dlerror()) != NULL)  {
-		error("error in dlsym : %s",dl_error);
-	}
-
 	asin += LIBMATH_ASIN_OFFSET;
 	tgammaf += LIBMATH_TGAMMAF_OFFSET;
-    fmodf -= LIBMATH_FMODF_OFFSET;
 
 	memset(results, 0, RESULTS_SIZE);
 
@@ -144,7 +126,6 @@ void *probe_thread(void *arg) {
 	info("LIB is at %p", library);
 	info("asin is at %p", asin);
 	info("tgamma at %p", tgammaf);
-	info("fmodf is at %p", fmodf);
 
     // TODO: receiver logic
 	int pos = 0, p1 = 0, p2 = 0, p3 = 0;
@@ -159,7 +140,6 @@ void *probe_thread(void *arg) {
 
 		asin_seen = probe(asin);
         tgammaf_seen = probe(tgammaf);
-        fmodf_seen = probe(fmodf);
 
 		if (asin_seen) {
 			results[pos]='S';
@@ -171,11 +151,6 @@ void *probe_thread(void *arg) {
             pos++;
             p2++;
         }
-        else if (fmodf_seen) {
-            results[pos] = 'M';
-            pos++;
-            p3++;
-        }
 
 		if (pos >= RESULTS_SIZE) {
             printf("pos = %d\n", pos);
@@ -185,6 +160,7 @@ void *probe_thread(void *arg) {
 	}
 	info("Results len : %d", pos);
     info("Probe 1 : %d | Probe 2 : %d | Probe 3 : %d\n", p1, p2, p3);
+    dlclose(library);
 	pthread_exit(NULL);
 }
 
@@ -205,9 +181,24 @@ int main(int argc, char **argv) {
 		error("can't create probe thread");
 	}
 
+    // TODO: signal presence to the sender
+	char *dl_error;
+	void *library = dlopen(LIBMATH_PATH, RTLD_NOW);
+	void *fmodf= dlsym(library, LIBMATH_FMODF);
+	if ((dl_error = dlerror()) != NULL)  {
+		error("error in dlsym : %s",dl_error);
+	}
+    void (*im_here)() = fmodf - LIBMATH_FMODF_OFFSET;
+	info("annobin_w_exp10f_compat.c_end is at %p\n", im_here);
+
+    for (int i = 0; i < 200; i++) {
+        im_here();
+        im_here();
+    }
+
     // Wait to give time for the sender to do his job
     puts("[+] Waiting..");
-    sleep(5);
+    sleep(3);
 
 	/* Stop the probing thread */
 	pthread_mutex_lock(&stopMutex);
@@ -225,7 +216,7 @@ int main(int argc, char **argv) {
     
     int prev_one = 0, prev_zero = 0;
 
-    for (int i = 0; i < results; i++) {
+    for (int i = 0; i < strlen(results); i++) {
         if (results[i] == 'S') {
             if (prev_zero) {
                 
