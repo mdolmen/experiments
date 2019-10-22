@@ -263,8 +263,9 @@ int main(int argc, char **argv) {
                     //printf("1 ");
                     c = c | 128 >> j;
                 }
-                else
+                else {
                     //printf("0 ");
+                }
                 j++;
 
                 ones = 0;
