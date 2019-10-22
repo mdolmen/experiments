@@ -5,6 +5,18 @@ Covert channel communication using CPU caches.
 
 Original cache-based side channel attack: https://github.com/polymorf/misc-cache-attacks
 
+Run
+---
+
+```bash
+make sender
+make receiver
+
+# In 2 different terminals. Sender as to be first.
+./sender
+./receiver
+```
+
 Testing environment
 -------------------
 
