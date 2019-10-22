@@ -16,6 +16,7 @@
 #include <math.h>
 
 #define THRESHOLD 150
+#define BUF_SIZE 2048
 
 #define LIBMATH_PATH "/lib64/libm.so.6"
 #define LIBMATH_ASIN "asin"
@@ -35,8 +36,15 @@
 #define LIBMATH_FMODF "fmodf"
 #define LIBMATH_FMODF_OFFSET 4 // annobin_w_exp10f_compat.c_end
 
-#define RESULTS_SIZE 1024*1024
+#define LIBMATH_FEGETENV "fegetenv"
+#define LIBMATH_FEGETENV_OFFSET 4 // annobin_fesetround.c_end
 
+#define LIBMATH_ATANHF "atanhf"
+#define LIBMATH_ATANHF_OFFSET 0xc
+
+#define RESULTS_SIZE 1024*1024*200
+
+//unsigned char* results = "GSSSSGGSSGGSSGGGSSGGGSSGGSSGGSGGGGF";
 unsigned char *results;
 pthread_mutex_t stopMutex;
 int stop_probing = 0;
@@ -102,23 +110,26 @@ void *probe_thread(void *arg) {
 		error("error in dlsym : %s",dl_error);
 	}
 
-	//void *acos = dlsym(library, LIBMATH_ACOS);
-	//if ((dl_error = dlerror()) != NULL)  {
-	//	error("error in dlsym : %s",dl_error);
-	//}
-
-	//void *lgammaf = dlsym(library, LIBMATH_LGAMMAF);
-	//if ((dl_error = dlerror()) != NULL)  {
-	//	error("error in dlsym : %s",dl_error);
-	//}
-
 	void *tgammaf = dlsym(library, LIBMATH_TGAMMAF);
+	if ((dl_error = dlerror()) != NULL)  {
+		error("error in dlsym : %s",dl_error);
+	}
+    
+	void *fegetenv = dlsym(library, LIBMATH_FEGETENV);
+	if ((dl_error = dlerror()) != NULL)  {
+		error("error in dlsym : %s",dl_error);
+	}
+    
+    // End signal
+	void *atanhf = dlsym(library, LIBMATH_ATANHF);
 	if ((dl_error = dlerror()) != NULL)  {
 		error("error in dlsym : %s",dl_error);
 	}
 
 	asin += LIBMATH_ASIN_OFFSET;
 	tgammaf += LIBMATH_TGAMMAF_OFFSET;
+    fegetenv -= LIBMATH_FMODF_OFFSET;
+    atanhf -= LIBMATH_ATANHF_OFFSET;
 
 	memset(results, 0, RESULTS_SIZE);
 
@@ -126,20 +137,17 @@ void *probe_thread(void *arg) {
 	info("LIB is at %p", library);
 	info("asin is at %p", asin);
 	info("tgamma at %p", tgammaf);
+	info("fegetenv at %p", fegetenv);
+	info("atanhf at %p", atanhf);
 
     // TODO: receiver logic
 	int pos = 0, p1 = 0, p2 = 0, p3 = 0;
-	while (1) {
-		pthread_mutex_lock(&stopMutex);
-		if ( stop_probing ) {
-			break;
-		}
-		pthread_mutex_unlock(&stopMutex);
-
-		int asin_seen = 0, acos_seen = 0, fmodf_seen = 0, tgammaf_seen = 0;
+	while ( probe(atanhf) == 0 ) {
+		int asin_seen = 0, acos_seen = 0, fegetenv_seen = 0, tgammaf_seen = 0;
 
 		asin_seen = probe(asin);
         tgammaf_seen = probe(tgammaf);
+		fegetenv_seen = probe(fegetenv);
 
 		if (asin_seen) {
 			results[pos]='S';
@@ -151,6 +159,11 @@ void *probe_thread(void *arg) {
             pos++;
             p2++;
         }
+        else if (fegetenv_seen) {
+            results[pos] = '\n';
+            pos++;
+            p3++;
+        }
 
 		if (pos >= RESULTS_SIZE) {
             printf("pos = %d\n", pos);
@@ -158,13 +171,24 @@ void *probe_thread(void *arg) {
 			break;
 		}
 	}
+    puts("[+] Done!");
+
+    pthread_mutex_lock(&stopMutex);
+    stop_probing = 1;
+    pthread_mutex_unlock(&stopMutex);
+
 	info("Results len : %d", pos);
     info("Probe 1 : %d | Probe 2 : %d | Probe 3 : %d\n", p1, p2, p3);
+
     dlclose(library);
 	pthread_exit(NULL);
 }
 
 int main(int argc, char **argv) {
+    FILE* output = NULL;
+    unsigned char* message = NULL;
+    size_t f_size = 0, bytes_read = 0;
+
 	//if (argc != 3) {
 	//	error("usage:  client <IP address> <port>");
 	//}
@@ -175,20 +199,27 @@ int main(int argc, char **argv) {
 		error("Error in malloc !");
 	}
 
+    // Prepare output file
+    output = fopen("output", "wb");
+    if ( !output ) {
+        puts("[!] Failed to open the file.");
+        exit(EXIT_FAILURE);
+    }
+
 	/* Start the probing thread */
 	pthread_t probe_t;
 	if(pthread_create(&probe_t, NULL, probe_thread, NULL) == -1) {
 		error("can't create probe thread");
 	}
 
-    // TODO: signal presence to the sender
+    // Signal presence to the sender
 	char *dl_error;
 	void *library = dlopen(LIBMATH_PATH, RTLD_NOW);
-	void *fmodf= dlsym(library, LIBMATH_FMODF);
+	void *acos= dlsym(library, LIBMATH_ACOS);
 	if ((dl_error = dlerror()) != NULL)  {
 		error("error in dlsym : %s",dl_error);
 	}
-    void (*im_here)() = fmodf - LIBMATH_FMODF_OFFSET;
+    void (*im_here)() = acos + LIBMATH_ACOS_OFFSET;
 	info("annobin_w_exp10f_compat.c_end is at %p\n", im_here);
 
     for (int i = 0; i < 200; i++) {
@@ -196,14 +227,14 @@ int main(int argc, char **argv) {
         im_here();
     }
 
-    // Wait to give time for the sender to do his job
+    // Wait to be sure the probing thread is up and running before continuing
     puts("[+] Waiting..");
-    sleep(3);
+    sleep(2);
+    puts("[+] Receiving data..");
+    while ( !stop_probing ) {}
+    puts("(debug) OK");
 
 	/* Stop the probing thread */
-	pthread_mutex_lock(&stopMutex);
-	stop_probing = 1;
-	pthread_mutex_unlock(&stopMutex);
 	pthread_cancel(probe_t);
 
 	/* Write results (usefull for graph) */
@@ -214,19 +245,66 @@ int main(int argc, char **argv) {
 	write(result_fd,results,strlen(results));
 	close(result_fd);
     
-    int prev_one = 0, prev_zero = 0;
+    int ones = 0, zeros = 0;
+	unsigned char msg[BUF_SIZE] = { '\0' };
+	char c = 0;
+    int j = 0, index = 0;
 
-    for (int i = 0; i < strlen(results); i++) {
-        if (results[i] == 'S') {
-            if (prev_zero) {
-                
+    for (int i = 0; i < RESULTS_SIZE; i++) {
+		if (results[i] == 'S') {
+			ones++;
+		}
+		else if (results[i] == 'G') {
+			zeros++;
+		}
+		else if (results[i] == '\n') {
+            if ( ones || zeros ) {
+                if (ones > zeros) {
+                    //printf("1 ");
+                    c = c | 128 >> j;
+                }
+                else
+                    //printf("0 ");
+                j++;
+
+                ones = 0;
+                zeros = 0;
             }
-            prev_one = 1;
+		}
+        
+        // We got enough bits for a byte
+        if (j > 0 && j % 8 == 0) {
+            //printf("(debug) c = %d | j = %d\n", c, j);
+
+            // Flush buffer to file
+            if (index == BUF_SIZE) {
+                fwrite(msg, BUF_SIZE, sizeof(char), output);
+                fflush(output);
+                memset(msg, '\0', BUF_SIZE);
+                index = 0;
+            }
+            msg[index] = c;
+
+            index++;
+            c = 0;
+            j = 0;
         }
-        else {
-            prev_zero = 1;
-        }
+        //printf("results[i] = %c | c = %d | zeros = %d | ones = %d | j = %d\n", results[i], c, zeros, ones, j);
     }
+
+    //printf("(debug) c = %d | j = %d\n", c, j);
+    // Flush buffer to file
+    if (index == BUF_SIZE) {
+        fwrite(msg, BUF_SIZE, sizeof(char), output);
+        fflush(output);
+        memset(msg, '\0', BUF_SIZE);
+        index = 0;
+    }
+    msg[index] = c;
+    index++;
+    fwrite(msg, index, sizeof(char), output);
+
+    fclose(output);
 
 	return EXIT_SUCCESS;
 }

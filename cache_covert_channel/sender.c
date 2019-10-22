@@ -4,11 +4,16 @@
 #include <math.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 #define THRESHOLD 150
 #define LIBMATH_PATH "/lib64/libm.so.6"
-#define LIBMATH_FMODF "fmodf"
-#define LIBMATH_FMODF_OFFSET 4 // annobin_w_exp10f_compat.c_end
+//#define LIBMATH_FMODF "fmodf"
+//#define LIBMATH_FMODF_OFFSET 4 // annobin_w_exp10f_compat.c_end
+#define LIBMATH_ATANHF "atanhf"
+#define LIBMATH_ATANHF_OFFSET 0xc
+#define LIBMATH_ACOS "acos"
+#define LIBMATH_ACOS_OFFSET 0x42
 
 pthread_mutex_t stopMutex;
 int signal = 0;
@@ -53,21 +58,22 @@ void *probe_thread(void *arg) {
 		error("dlopen failed: %s",dl_error);
 	}
 
-	void *fmodf= dlsym(library, LIBMATH_FMODF);
+	void *acos= dlsym(library, LIBMATH_ACOS);
 	if ((dl_error = dlerror()) != NULL)  {
 		error("error in dlsym : %s",dl_error);
 	}
 
-    fmodf -= LIBMATH_FMODF_OFFSET;
-	printf("annobin_w_exp10f_compat.c_end is at %p\n", fmodf);
+    acos += LIBMATH_ACOS_OFFSET;
+	printf("annobin_w_acos_compat.c_end is at %p\n", acos);
 
     // wait for signal from receiver
-	while ( probe(fmodf) == 0 ) { }
+	while ( probe(acos) == 0 ) { }
 
     pthread_mutex_lock(&stopMutex);
     signal = 1;
     pthread_mutex_unlock(&stopMutex);
 
+    dlclose(library);
 	pthread_exit(NULL);
 }
 
@@ -75,10 +81,39 @@ int main(void)
 {
     float test = 0.0, x = 0.0;
     double y = -1.0;
+    char junk[100] = { '\0' };
 
-    // TODO: open file
+    FILE* fp = NULL;
+    unsigned char* message = NULL;
+    size_t f_size = 0, bytes_read = 0;
 
-    // TODO: read file bit by bit
+    fp = fopen("message.txt", "rb");
+    if ( !fp ) {
+        puts("[!] Failed to open the file.");
+        exit(EXIT_FAILURE);
+    }
+    
+    // Get file size
+    fseek(fp, 0L, SEEK_END);
+    f_size = ftell(fp);
+    rewind(fp);
+
+    message = malloc(f_size * sizeof(char));
+    if ( !message ) {
+        puts("[!] Failed to allocate memory.");
+        exit(EXIT_FAILURE);
+    }
+
+    // Read file content
+    bytes_read = fread(message, f_size, sizeof(char), fp);
+    if ( !bytes_read ) {
+        puts("[!] Failed to read the file.");
+        exit(EXIT_FAILURE);
+    }
+
+    /*
+     * Get addresses of instructions to call
+     */
 
 	char *dl_error = NULL;
 	void *library = dlopen(LIBMATH_PATH, RTLD_NOW);
@@ -106,54 +141,78 @@ int main(void)
     }
     void (*annobin_1)() = tgammaf+0x54e;
 
-    // math:fmodf()
-	//void *fmodf= dlsym(library, "fmodf");
-	//if ((dl_error = dlerror()) != NULL)  {
-	//	printf("error in dlsym : %s\n", dl_error);
-	//}
-    //else {
-    //    printf("annobin_w_exp10f_compat.c_end at %p\n", fmodf-0x4);
-    //}
-    //void (*annobin_2)() = fmodf-0x4;
+    // math:fegetenv()
+	void *fegetenv= dlsym(library, "fegetenv");
+	if ((dl_error = dlerror()) != NULL)  {
+		printf("error in dlsym : %s\n", dl_error);
+	}
+    else {
+        printf("annobin_w_exp10f_compat.c_end at %p\n", fegetenv-0x4);
+    }
+    void (*annobin_2)(char* junk) = fegetenv-0x4;
+
+    // math:atanhf()
+	void *atanhf = dlsym(library, "atanhf");
+	if ((dl_error = dlerror()) != NULL)  {
+		printf("error in dlsym : %s\n", dl_error);
+	}
+    else {
+        printf("annobin_w_atan2f_compat.c_end at %p\n", atanhf-0xc);
+    }
+    void (*annobin_3)() = atanhf-0xc;
 
     puts("[+] Waiting for receiver to signal its presence..");
 
-    // TODO: probe for start signal from "receiver"
+    // Probe for start signal from "receiver"
 	pthread_t probe_t;
 	if(pthread_create(&probe_t, NULL, probe_thread, NULL) == -1) {
 		error("can't create probe thread");
 	}
 
     while ( !signal ) { }
+	pthread_cancel(probe_t);
     puts("[+] Receiver present, start sending..");
+
+    // Wait a few second, it seem to give less false positives than when calling
+    // functions directly after.
+    sleep(2);
 
     // Call functions to put instruction into the cache
     puts("[+] Calling functions..");
-    // 0 -> 7
-    // 1 -> 7
-    char* msg = "10101010101010";
-    int i = 0;
-    while (*msg != '\0') {
-        switch (*msg) {
-            case '1':
-                while ( __builtin_expect(!!(i < 50), 1) ) {
+
+    //printf("message = %s\n", message);
+
+    while (*message != '\0') {
+        for (int i = 0; i < 8; i++) {
+            if ( *message & (128 >> i) ) {
+                // '1';
+                for (int i = 0; i < 20; i++) {
                     annobin_0();
                     annobin_0();
-                    i++;
                 }
-                break;
-            case '0':
-                for (int i = 0; i < 50; i++) {
-                    annobin_1();
-                    annobin_1();
-                }
-                break;
+            }
+            else {
+                // '0'
+                annobin_1();
+                annobin_1();
+                annobin_1();
+                annobin_1();
+            }
+
+            // Delimit bits
+            for (int i = 0; i < 20; i++) {
+                annobin_2(junk);
+                annobin_2(junk);
+            }
         }
 
-        //for (int i = 0; i < 5; i++)
-        //    annobin_2();
+        message++;
+    }
 
-        msg++;
+    // Signal receiver there is nothing more
+    for (int i = 0; i < 200; i++) {
+        annobin_3();
+        annobin_3();
     }
 
     return EXIT_SUCCESS;
