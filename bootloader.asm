@@ -4,7 +4,6 @@
 ; Source (to print text): https://stackoverflow.com/questions/36847806/printing-a-string-of-characters-from-a-boot-sector-only-displays-first-character
 ;
 
-org 0x7c00
 bits 16
 
 start:
