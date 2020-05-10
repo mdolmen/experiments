@@ -4,5 +4,19 @@ Compile
 -------
 
 ```bash
-cargo rustc -- -C link-args=-nostartfiles
+#cargo rustc -- -C link-args=-nostartfiles
+
+#cargo xbuild --target x86_64-ros-target.json
+
+cargo bootimage
+```
+
+Run
+---
+
+```bash
+#qemu-system-x86_64 -drive format=raw,file=target/x86_64-ros-target/debug/bootimage-ros.bin
+
+# With a .cargo/config file and the "runner" option set
+cargo xrun
 ```
