@@ -26,3 +26,17 @@ VGA text mode
 - `read()` and `write()` method to access `volotaile` vars
 - limitation for static interface (due to current Rust state)
 	- `lazy_static` crate used to circumvent this
+
+Testing
+-------
+
+- need some feature attribute to make a custom test framework which does not
+    rely on `std`
+- the crate `x86_64` gives features to manipulate system regs (like `in` and
+    `out` instructions)
+- the crate `uart_16550` ease the implementation of an UART interface (to print
+    QEMU's output to `stdio`)
+- executable in `tests/` are automatically consider as tests (no need for
+   `#[test_case]`)
+- `lib.rs` recognized by cargo and build as a library, contains all public code
+  usable by other modules (e.g. the tests)

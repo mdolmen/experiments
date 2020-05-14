@@ -3,6 +3,9 @@ use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
+#[cfg(test)]
+use crate::{ serial_print, serial_println };
+
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -141,6 +144,7 @@ impl Writer {
     }
 }
 
+#[allow(dead_code)]
 pub fn print_something() {
     use core::fmt::Write;
 
@@ -155,7 +159,7 @@ pub fn print_something() {
     writer.write_byte(b'\n');
     write!(writer, "Some numbers {}, {}", 42, 1.0).unwrap();
     writer.new_line();
-    for i in 0..4 {
+    for _i in 0..4 {
         writer.write_string("some other text\n");
     }
 }
@@ -169,3 +173,31 @@ lazy_static! {
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
+
+/*
+ * TESTS
+ */
+/*
+#[test_case]
+fn test_println_output() {
+    serial_print!("test_println_output...");
+
+    let s = "Some test string that fits on a single line";
+    println!("{}", s);
+    for (i, c) in s.chars().enumerate() {
+        let screen_char = WRITER.lock().buffer.chars[2][i].read();
+        assert_eq!(char::from(screen_char.ascii_char), c);
+    }
+
+    serial_println!("[ok]");
+}
+
+#[test_case]
+fn test_println_many() {
+    serial_print!("test_println_many...");
+    for _ in 0..30 {
+        println!("test_println_many");
+    }
+    serial_println!("[ok]");
+}
+*/
