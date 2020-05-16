@@ -23,9 +23,11 @@ VGA text mode
 - VGA buffer accessible at 0xb8000
 - `volatile` to avoid optimization for value that may seem unused by the
     compiler (like writing to MMIO buffer)
-- `read()` and `write()` method to access `volotaile` vars
+- `read()` and `write()` method to access `volatile` vars
 - limitation for static interface (due to current Rust state)
-	- `lazy_static` crate used to circumvent this
+	- `lazy_static` crate used to circumvent this, it performs the
+	    initialization of the var at the first encounter instead of doing it
+	    at compile time
 
 Testing
 -------
@@ -40,3 +42,13 @@ Testing
    `#[test_case]`)
 - `lib.rs` recognized by cargo and build as a library, contains all public code
   usable by other modules (e.g. the tests)
+
+CPU exceptions
+--------------
+
+- `x86-interrupt` as calling convention to preserves all registers when entering
+    an interrupt handler
+- **IDT** and **Interrupt Stack Frame** are represented in the `x86_64` crate
+- `iretq` instruction to return from interrupt
+- A `.rs` file is a `module` except for the `main.rs` and `lib.rs` which are
+    crates (the final binary objects)
