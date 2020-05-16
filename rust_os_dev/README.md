@@ -19,4 +19,9 @@ Run
 
 # With a .cargo/config file and the "runner" option set
 cargo xrun
+
+# To run the tests...
+cargo xtests
+# ...or
+cargo xtests --test <name_of_module>
 ```

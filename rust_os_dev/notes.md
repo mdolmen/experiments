@@ -52,3 +52,20 @@ CPU exceptions
 - `iretq` instruction to return from interrupt
 - A `.rs` file is a `module` except for the `main.rs` and `lib.rs` which are
     crates (the final binary objects)
+- **IDTR**: register to hold the address of the IDT
+
+Double faults
+-------------
+
+- double faults occur only in certain combinaison of successive faults (it is ok
+    for a page fault to occur within a divide-by-zero interruption handler)
+- **Interrupt Stack Table** (IST): Table to valid stack base addresses, used to
+    switch stack before an handling exception so the CPU can push the exception
+    stack frame without causing a page fault
+- **Task State Segment** (TSS): Holds the IST, the **Privilege Stack Table** and
+    the **I/O Map Base Address**
+- **Global Descriptor Table** (GDT): Use to configure segmented virtual memory,
+    still needed even in 64-bit mode (where paging is used instead) to load the
+    TSS (and kernel/user mode config)
+- disable test harness in `Cargo.toml` to execute the test directly from
+    `_start`, without a `runner`

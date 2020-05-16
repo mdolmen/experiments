@@ -10,6 +10,7 @@ use core::panic::PanicInfo;
 pub mod vga_buffer;
 pub mod serial;
 pub mod interrupts;
+pub mod gdt;
 
 #[cfg(test)]
 #[no_mangle]
@@ -60,5 +61,6 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 }
 
 pub fn init() {
+    gdt::init();
     interrupts::idt_init();
 }
