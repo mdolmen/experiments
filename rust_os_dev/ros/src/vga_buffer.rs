@@ -20,7 +20,11 @@ macro_rules! println {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
-    WRITER.lock().write_fmt(args).unwrap();
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| { 
+        WRITER.lock().write_fmt(args).unwrap(); 
+    });
 }
 
 const BUFFER_HEIGHT: usize = 25;
@@ -125,7 +129,6 @@ impl Writer {
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
-            self.column_position -= 1;
         } else {
             self.row_position += 1;
         }
@@ -177,18 +180,11 @@ lazy_static! {
 /*
  * TESTS
  */
-/*
+
 #[test_case]
-fn test_println_output() {
-    serial_print!("test_println_output...");
-
-    let s = "Some test string that fits on a single line";
-    println!("{}", s);
-    for (i, c) in s.chars().enumerate() {
-        let screen_char = WRITER.lock().buffer.chars[2][i].read();
-        assert_eq!(char::from(screen_char.ascii_char), c);
-    }
-
+fn test_println() {
+    serial_print!("test_println...");
+    println!("test_println");
     serial_println!("[ok]");
 }
 
@@ -200,4 +196,25 @@ fn test_println_many() {
     }
     serial_println!("[ok]");
 }
-*/
+
+#[test_case]
+fn test_println_output() {
+    use core::fmt::Write;
+    use x86_64::instructions::interrupts;
+
+    serial_print!("test_println_output...");
+
+    let s = "Some test string that fits on a single line";
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+
+        writeln!(writer, "\n{}", s).expect("writeln failed");
+        for (i, c) in s.chars().enumerate() {
+            let row = writer.row_position;
+            let screen_char = writer.buffer.chars[row-1][i].read();
+            assert_eq!(char::from(screen_char.ascii_char), c);
+        }
+    });
+
+    serial_println!("[ok]");
+}

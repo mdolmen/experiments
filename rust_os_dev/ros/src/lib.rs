@@ -19,7 +19,7 @@ pub extern "C" fn _start() -> ! {
     init();
     test_main();
 
-    loop {}
+    hlt_loop();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -48,7 +48,7 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
     serial_println!("[failed]\n");
     serial_println!("[PANIC] {}\n", info);
     exit_qemu(QemuExitCode::Failure);
-    loop {}
+    hlt_loop();
 }
 
 pub fn test_runner(tests: &[&dyn Fn()]) {
@@ -63,4 +63,14 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 pub fn init() {
     gdt::init();
     interrupts::idt_init();
+
+    // Enable hardware interrupts
+    unsafe { interrupts::PICS.lock().initialize() };
+    x86_64::instructions::interrupts::enable();
+}
+
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
 }

@@ -18,7 +18,11 @@ macro_rules! serial_println {
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
-    SERIAL.lock().write_fmt(args).expect("[-] Printing to serial failed!");
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| { 
+        SERIAL.lock().write_fmt(args).expect("[-] Printing to serial failed!");
+    });
 }
 
 lazy_static! {

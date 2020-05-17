@@ -60,12 +60,31 @@ Double faults
 - double faults occur only in certain combinaison of successive faults (it is ok
     for a page fault to occur within a divide-by-zero interruption handler)
 - **Interrupt Stack Table** (IST): Table to valid stack base addresses, used to
-    switch stack before an handling exception so the CPU can push the exception
-    stack frame without causing a page fault
+    switch stacks before the handling of an exception so that the CPU can push the
+    exception stack frame without causing a page fault
 - **Task State Segment** (TSS): Holds the IST, the **Privilege Stack Table** and
     the **I/O Map Base Address**
-- **Global Descriptor Table** (GDT): Use to configure segmented virtual memory,
+- **Global Descriptor Table** (GDT): Used to configure segmented virtual memory,
     still needed even in 64-bit mode (where paging is used instead) to load the
-    TSS (and kernel/user mode config)
+    TSS (and for kernel/user mode transition)
 - disable test harness in `Cargo.toml` to execute the test directly from
     `_start`, without a `runner`
+
+Hardware interrupts
+-------------------
+
+- how the `Mutex`'s `lock()` method from the `spin` crate works (cf. crate's
+    doc):
+> Locks the spinlock and returns a guard.
+> The returned value may be dereferenced for data access and the lock will be
+> dropped when the guard falls out of scope.
+- `sti` instruction = set interrupts
+- add the `pic8259_simple` crate for a PIC implementation (the timer is enabled
+    by default, need to catch those INT first)
+- the PIC expect an "end of interrupt" (EOI) signal to know that the interrupt
+    has been dealt with
+- need to disable interrupts in the `_print` macro to avoid deadlocks since it
+    is also used in the handlers
+- the PS/2 controller won't send new interrupts until the scancode is read (data
+    port of the controller)
+- `Some(var)` is equivalent to `if var is None` in Python (cf. std::Option)
