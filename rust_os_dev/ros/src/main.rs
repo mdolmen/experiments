@@ -33,8 +33,10 @@ pub extern "C" fn _start() -> ! {
     println!("Welcome to the MATRIX!");
     //panic!("test");
 
-    // Init IDT and trigger a breakpoint
+    // Init IDT
     ros::init();
+
+    unsafe { *(0xdeadbeef as *mut u32) = 42 };
 
     #[cfg(test)]
     test_main();

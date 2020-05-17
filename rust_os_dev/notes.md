@@ -88,3 +88,14 @@ Hardware interrupts
 - the PS/2 controller won't send new interrupts until the scancode is read (data
     port of the controller)
 - `Some(var)` is equivalent to `if var is None` in Python (cf. std::Option)
+
+Paging introduction
+-------------------
+
+- page = virtual memory
+- frame = physical memory
+- paging already implemented here thanks to the bootloader crate
+- **Identity Mapped** == **Identity Paging** == **1:1 Paging**
+    - the virtual address == the physical address
+- the `CR2` register contains the virtual address responsible for a page fault
+- the `CR3` register conatins a physical memory address
