@@ -62,13 +62,12 @@ extern "x86-interrupt" fn double_fault_handler(
     panic!("[EXCEPTION] DOUBLE FAULT\n{:#?}\nError code: {}", stack_frame, error);
 }
 
-extern "x86-interrupt" fn timer_int_handler(stack_frame: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn timer_int_handler(_stack_frame: &mut InterruptStackFrame) {
     unsafe { PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8()) };
 }
 
-extern "x86-interrupt" fn keyboard_int_handler(stack_frame: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn keyboard_int_handler(_stack_frame: &mut InterruptStackFrame) {
     use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-    use spin::Mutex;
     use x86_64::instructions::port::Port;
 
     lazy_static! {

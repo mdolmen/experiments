@@ -99,3 +99,25 @@ Paging introduction
     - the virtual address == the physical address
 - the `CR2` register contains the virtual address responsible for a page fault
 - the `CR3` register conatins a physical memory address
+
+Paging implementation
+---------------------
+
+- recursive mapping allows to skip a level of translation by having an entry
+    in the page pointing to another entry of the same page, this time being
+    considered by the CPU as an entry of the next level page table
+- the `BootInfo` arg of `_start()` comes from the bootloader
+- `_start()` can be renamed in a "normal" function, without the feature attribute
+    and `extern` keyword thanks to the `entry_point!` macro from the `bootloader`
+    crate
+- the `x86_64` crate offers abstraction for address translations (has the
+    advantages of supporting *huge pages*)
+- `'static` lifetime means the object lives for the entire duration of the
+    program
+- problematic when creating a new mapping:
+    > In summary, the difficulty of creating a new mapping depends on the virtual
+    > page that we want to map. In the easiest case, the level 1 page table for
+    > the page already exists and we just need to write a single entry. In the
+    > most difficult case, the page is in a memory region for that no level 3
+    > exists yet so that we need to create new level 3, level 2 and level 1 page
+    > tables first.
