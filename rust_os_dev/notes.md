@@ -121,3 +121,19 @@ Paging implementation
     > most difficult case, the page is in a memory region for that no level 3
     > exists yet so that we need to create new level 3, level 2 and level 1 page
     > tables first.
+
+Heap allocation
+---------------
+
+- `(x as *mut 32).offset(i)` is equivalent to `(int*)x[i]` in C
+- dynamic allocation usually done with `Box::new()` (uses `allocate` behind the
+    scene)
+- the `Drop` trait defines how to free an object when it goes out of scope
+- to add a dependecy to the built-in `alloc` crate we need to implement the
+    `GlobalAlloc` trait for a static object (i.e. a heap allocator)
+- a `trait` is like a collection of abstract methods
+    - a method of the trait can have a default implementation
+- `?` akin to a `try..catch`, returns early in case of an error
+- takeaway from summary
+    > defined a virtual address range for the heap (Page::range_inclusive())
+    > mapped all pages of that range to physical frames using the Mapper and FrameAllocator

@@ -6,9 +6,12 @@
 #![test_runner(ros::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+extern crate alloc;
+
 use core::panic::PanicInfo;
 use ros::println;
 use bootloader::{BootInfo, entry_point};
+use alloc::{boxed::Box, vec::Vec};
 
 entry_point!(kernel_main);
 
@@ -27,7 +30,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use ros::memory;
+    use ros::{memory, allocator};
     use ros::memory::BootInfoFrameAllocator;
     use x86_64::{
         structures::paging::Page,
@@ -74,6 +77,16 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
     unsafe { page_ptr.offset(357).write_volatile(0x_f021_f077_f065_f04e)};
+
+    // Using the dynamic memory allocator
+    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap init failed");
+    let _x = Box::new(11);
+    let mut y = Vec::new();
+
+    for i in 0..20 {
+        y.push(i);
+    }
+    println!("y at {:p}", y.as_slice());
 
     #[cfg(test)]
     test_main();
