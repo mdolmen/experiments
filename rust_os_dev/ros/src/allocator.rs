@@ -6,7 +6,13 @@ use x86_64::{
     },
     VirtAddr,
 };
-use linked_list_allocator::LockedHeap;
+use bump::BumpAlloc;
+use linked_list::LinkedListAllocator;
+use fixed_size_block::FixedSizeBlockAllocator;
+
+pub mod bump;
+pub mod linked_list;
+pub mod fixed_size_block;
 
 pub struct Dummy;
 
@@ -14,7 +20,9 @@ pub const HEAP_START: usize = 0x4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024;
 
 #[global_allocator] // makes it the global heap allocator
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+//static ALLOCATOR: Locked<BumpAlloc> = Locked::new(BumpAlloc::new());
+//static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 
 unsafe impl GlobalAlloc for Dummy {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
@@ -24,6 +32,28 @@ unsafe impl GlobalAlloc for Dummy {
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
         panic!("dealloc should never be called")
     }
+}
+
+// A wrapper around spin::Mutex to permit trait implementations.
+pub struct Locked<A> {
+    inner: spin::Mutex<A>,
+}
+
+impl<A> Locked<A> {
+    pub const fn new(inner: A) -> Self {
+        Locked {
+            inner: spin::Mutex::new(inner),
+        }
+    }
+
+    pub fn lock(&self) -> spin::MutexGuard<A> {
+        self.inner.lock()
+    }
+}
+
+// Align the given address.
+fn align_up(addr: usize, align: usize) -> usize {
+    (addr + align-1) & !(align-1)
 }
 
 // Map the heap pages.

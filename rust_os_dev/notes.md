@@ -137,3 +137,18 @@ Heap allocation
 - takeaway from summary
     > defined a virtual address range for the heap (Page::range_inclusive())
     > mapped all pages of that range to physical frames using the Mapper and FrameAllocator
+
+Allocator designs
+-----------------
+
+- **bump allocator**: linearly allocates memory, can only free all the memory at
+    once
+- a global heap allocator is defined with the `#[global_allocator]` attribute to
+    a static object implementing `GloablAlloc`
+    - need to turn the `&self` (of `BumpAlloc::alloc()`) to a `&mut self` with a
+	spinlock
+- *pool allocators* refers to allocator using linked list
+- the `take()` method literally *take* the value of the object (to put it in a
+    variable) and replace it by `None` into that object
+- **slab allocator**: uses block sizes that correspond to selected types
+- **buddy allocator**: the free list is in a binary tree
