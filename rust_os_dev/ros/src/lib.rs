@@ -7,6 +7,7 @@
 #![feature(alloc_error_handler)] // because it's experimental
 #![feature(const_fn)]
 #![feature(const_in_array_repeat_expressions)]
+#![feature(wake_trait)] // for the Wake trait
 
 extern crate alloc;
 

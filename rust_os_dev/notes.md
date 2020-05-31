@@ -185,3 +185,5 @@ Async/Await
     but when it returns `Poll::Ready(None)` it means the stream is done, otherwise
     open and can be polled indefinitely
     - returns `Poll::Ready(Some)`
+- need to put the CPU idle when the task queue is empty to lower its charge
+    - requires to disable interrupts before checking the queue

@@ -11,7 +11,7 @@ pub mod executor;
 pub mod keyboard;
 
 pub struct Task {
-    id: TaskId;
+    id: TaskId,
     future: Pin<Box<dyn Future<Output = ()>>>,
 }
 
@@ -29,7 +29,7 @@ impl Task {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct taskId(u64);
+struct TaskId(u64);
 
 impl TaskId {
     fn new() -> Self {

@@ -11,7 +11,7 @@ extern crate alloc;
 use core::panic::PanicInfo;
 use ros::{
     println,
-    task::{Task, simple_executor::SimpleExecutor, keyboard},
+    task::{Task, simple_executor::SimpleExecutor, keyboard, executor::Executor},
 };
 use bootloader::{BootInfo, entry_point};
 use alloc::{boxed::Box, vec::Vec};
@@ -92,7 +92,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("y at {:p}", y.as_slice());
 
     // Test multitasking with an 'executor' and a 'waker'
-    let mut executor = SimpleExecutor::new();
+    let mut executor = Executor::new();
     executor.spawn(Task::new(example_task()));
     executor.spawn(Task::new(keyboard::print_keypresses()));
     executor.run();
