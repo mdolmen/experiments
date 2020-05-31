@@ -152,3 +152,36 @@ Allocator designs
     variable) and replace it by `None` into that object
 - **slab allocator**: uses block sizes that correspond to selected types
 - **buddy allocator**: the free list is in a binary tree
+
+Async/Await
+-----------
+
+- with **cooperative multitasking**, it's up to the task to pause itself, it can
+    backup needed stack data, and all tasks share the same stack
+- a **future** represents a value that might not be available yet
+- a **future combinator** is a way to wait asynchronously before using a
+    variable, without the need for a blocking poll loop (e.g. The reading of a
+    file returns a *future* so that following instructions can execute. One of
+    these instructions may be a function computing the length of what was read,
+    so it uses another *future* (combined with the first) to wait that the file
+    is available.)
+- a `closure` is an aninymous function stored in a variable which gets executed
+    only where it is needed
+- it's possible to do *memoization* using `closure` and `generic parameters` in
+    a struct (implementation of the `Fn` trait)
+    - see: https://doc.rust-lang.org/book/ch13-01-closures.html
+- `async`: turn a function to an asynchronous one which will return a `future`
+- `await`: wait for the value of a `future`
+- `pinning` offers the possibility to force a struct to be at the same address
+    (useful for *self-referential* struct, where an element is a ref to another
+    part of the struct)
+- the `self: Pin<&mut Self>` arg of `poll()` for the `Future` trait guarentees
+    that the *futures* are not moved between `poll()` calls
+- an `executors` polls every `futures` until they are done
+- a `waker` allows a future to signal its status so that the `executor` does not
+    have to poll constantly
+- `crossbeam`: crate which provides a lock-free queue usable in an interrupt
+- the `future` crate provides the `Stream` trait: definition similar to `Future`
+    but when it returns `Poll::Ready(None)` it means the stream is done, otherwise
+    open and can be polled indefinitely
+    - returns `Poll::Ready(Some)`

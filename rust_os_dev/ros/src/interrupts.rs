@@ -69,6 +69,7 @@ extern "x86-interrupt" fn timer_int_handler(_stack_frame: &mut InterruptStackFra
 extern "x86-interrupt" fn keyboard_int_handler(_stack_frame: &mut InterruptStackFrame) {
     use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
     use x86_64::instructions::port::Port;
+    use crate::task::keyboard::add_scancode;
 
     lazy_static! {
         static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = 
@@ -79,15 +80,8 @@ extern "x86-interrupt" fn keyboard_int_handler(_stack_frame: &mut InterruptStack
     // Data port of the PS/2 controller
     let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
-
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::Unicode(character) => print!("{}", character),
-                DecodedKey::RawKey(key) => print!("{:?}", key),
-            }
-        }
-    }
+    // push scancode to the worker queue
+    add_scancode(scancode);
 
     unsafe { PICS.lock().notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8()) };
 }
