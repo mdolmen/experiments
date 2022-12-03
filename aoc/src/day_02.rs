@@ -1,5 +1,6 @@
 use std::fs;
 
+#[allow(dead_code)]
 pub fn solution() {
     //let input = "A Y\nB X\nC Z\nA Z";
     let input = fs::read_to_string("resources/02_input_00.txt")
