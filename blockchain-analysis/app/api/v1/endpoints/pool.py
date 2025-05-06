@@ -35,7 +35,7 @@ async def get_largest_pool(params: PoolParams):
 
     # Find largest pool
     largest_pool = max(pairs, key=lambda pool: pool.get("liquidity", {}).get("usd", 0))
-    return {"message": f"{largest_pool}"}
+    return {"message": largest_pool}
 
 @router.post("liquidity")
 async def get_liquidity():
