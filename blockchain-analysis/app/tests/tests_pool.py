@@ -38,3 +38,22 @@ def test_liquidity():
         print("Error occurred:", response_json["error"])
     else:
         print("Aggregated liquidity:", response_json.get("message"))
+
+def test_number_of_pools():
+    client = TestClient(app)
+
+    payload = {
+        "chain": "solana",
+        "address": "FQgtfugBdpFN7PZ6NdPrZpVLDBrPGxXesi4gVu3vErhY"
+    }
+
+    response = client.post("/v1/number-of-pools", json=payload)
+
+    assert response.status_code == 200
+
+    # Assert that the response contains the expected output
+    response_json = response.json()
+    if "error" in response_json:
+        print("Error occurred:", response_json["error"])
+    else:
+        print("Number of pools:", response_json.get("message"))

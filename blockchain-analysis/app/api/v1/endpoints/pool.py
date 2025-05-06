@@ -47,5 +47,9 @@ async def get_liquidity(params: PoolParams):
     return {"message": liquidity}
 
 @router.post("/number-of-pools")
-async def get_number_of_pools():
-    return {"message": "TODO: get the number of pools"}
+async def get_number_of_pools(params: PoolParams):
+    pairs = get_chain_data(params.chain, params.address)
+    if "error" in pairs:
+        return pairs
+
+    return {"message": len(pairs)}
