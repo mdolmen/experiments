@@ -37,9 +37,14 @@ async def get_largest_pool(params: PoolParams):
     largest_pool = max(pairs, key=lambda pool: pool.get("liquidity", {}).get("usd", 0))
     return {"message": largest_pool}
 
-@router.post("liquidity")
-async def get_liquidity():
-    return {"message": "TODO: get liquidity of all pools"}
+@router.post("/liquidity")
+async def get_liquidity(params: PoolParams):
+    pairs = get_chain_data(params.chain, params.address)
+    if "error" in pairs:
+        return pairs
+
+    liquidity = sum(pool.get("liquidity", {}).get("usd", 0) for pool in pairs)
+    return {"message": liquidity}
 
 @router.post("/number-of-pools")
 async def get_number_of_pools():
