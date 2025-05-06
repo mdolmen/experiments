@@ -1,19 +1,40 @@
+import requests
+
 from fastapi import APIRouter
+from pydantic import BaseModel
+
+SUPPORTED_CHAINS = ['solana']
 
 router = APIRouter()
+
+class PoolParams(BaseModel):
+    chain: str
+    address: str
 
 @router.get("/")
 async def index():
     return {"message": "ping ok"}
 
-@router.get("/largest-pool")
-async def get_largest_pool():
-    return {"message": "TODO: get info about the largest pool"}
+@router.post("/largest-pool")
+async def get_largest_pool(params: PoolParams):
+    if params.chain not in SUPPORTED_CHAINS:
+        return {"error": f"Unsupported chain provided: {params.chain}"}
 
-@router.get("liquidity")
+    # Get data from Dexscreener's API
+    url = f"https://api.dexscreener.com/token-pairs/v1/{params.chain}/{params.address}"
+    response = requests.get(url)
+    if response.status_code != 200:
+        return {"error": "Failed to fetch data from DexScreener"}
+    pairs = response.json()
+
+    # Find largest pool
+    largest_pool = max(pairs, key=lambda pool: pool.get("liquidity", {}).get("usd", 0))
+    return {"message": f"{largest_pool}"}
+
+@router.post("liquidity")
 async def get_liquidity():
     return {"message": "TODO: get liquidity of all pools"}
 
-@router.get("/number-of-pools")
+@router.post("/number-of-pools")
 async def get_number_of_pools():
     return {"message": "TODO: get the number of pools"}
